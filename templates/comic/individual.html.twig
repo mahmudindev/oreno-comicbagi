@@ -3,6 +3,7 @@
 {% set req_langs = app.request.languages|map(l => l|replace({'_': '-'})) %}
 {% set app_langs = funcComicBagiApp.languages(null)|map(l => l.lang) %}
 {% set rec_langs = funcComicBagiApp.recommendedLangs(app_langs, req_langs) %}
+{% set unredacts = app.request.cookies.get('unredacts')|split(', ') %}
 
 {% set comic_titles = funcComicKingApi.comicTitles(result.code, rec_langs, 1) %}
 {% if comic_titles|length > 0 %}
@@ -19,7 +20,7 @@
             <div class="d-flex flex-column flex-md-row gap-3 comic-card">
                 {% set comic_covers = funcComicKingApi.comicCovers(result.code, [], 1) %}
                 {% if comic_covers|length > 0 %}
-                    {% set comic_cover = comic_covers[0] %}
+                    {% set comic_cover = funcComicKingApi.image(comic_covers[0].imageULID) %}
                 {% else %}
                     {% set comic_cover = null %}
                 {% endif %}
@@ -49,6 +50,32 @@
                     </div>
                 </div>
             </div>
+
+            <div class="d-flex flex-column flex-md-row gap-2 p-3 border border-2">
+                <label for="unredacts">Unredacts:</label>
+                <input type="text" id="unredacts" placeholder="example.com, another.org, etc" class="flex-grow-1">
+                <button type="button" onclick="setUnredacts()">Save</button>
+            </div>
+            <script>
+            function getUnredacts() {
+                const cookies = document.cookie.split('; ');
+                for (const cookie of cookies) {
+                    const [key, val] = cookie.split('=');
+                    if (decodeURIComponent(key) === 'unredacts') {
+                        return decodeURIComponent(val);
+                    }
+                }
+                return '';
+            }
+
+            function setUnredacts() {
+                const value = document.getElementById('unredacts').value.trim();
+                document.cookie = 'unredacts=' + encodeURIComponent(value) + '; path=/; max-age=31536000';
+                location.reload();
+            }
+
+            document.getElementById('unredacts').value = getUnredacts();
+            </script>
 
             {% set dis_langs = rec_langs|merge(app_langs|filter(v => v not in rec_langs)) %}
 

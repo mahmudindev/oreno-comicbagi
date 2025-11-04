@@ -6,6 +6,7 @@ use App\Entity\Link;
 use App\Model\OrderByDto;
 use App\Repository\LinkRepository;
 use App\Repository\WebsiteRepository;
+use App\Util\StringUtil;
 use App\Util\UrlQuery;
 use App\Util\Href;
 use Doctrine\ORM\EntityManagerInterface;
@@ -38,7 +39,7 @@ class RestLinkController extends AbstractController
         Request $request,
         #[HttpKernel\MapQueryParameter(options: ['min_range' => 1])] int $page = 1,
         #[HttpKernel\MapQueryParameter(options: ['min_range' => 1, 'max_range' => 30])] int $limit = 10,
-        #[HttpKernel\MapQueryParameter] string $order = null
+        #[HttpKernel\MapQueryParameter] string | null $order = null
     ): Response {
         $queries = new UrlQuery($request->server->get('QUERY_STRING'));
 
@@ -58,6 +59,17 @@ class RestLinkController extends AbstractController
         $headers = [];
         $headers['X-Total-Count'] = $this->linkRepository->countCustom($criteria);
         $headers['X-Pagination-Limit'] = $limit;
+
+        $customUnredacts = $queries->all('unredact', 'unredacts');
+        foreach ($result as $v) {
+            $v1 = $v->getWebsite();
+            if ($v1->isRedacted() && !\in_array($v1->getHost(), $customUnredacts)) {
+                $v1->setHost(StringUtil::redact($v1->getHost(), 2, ['.']));
+                $v1->setName(StringUtil::redact($v1->getName(), 2));
+            } else {
+                $v1->setRedacted(false);
+            }
+        }
 
         $response = $this->json($result, Response::HTTP_OK, $headers, ['groups' => ['link']]);
 

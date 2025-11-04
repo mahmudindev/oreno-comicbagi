@@ -3,24 +3,19 @@
 namespace App\Service;
 
 use App\Model\OrderByDto;
-use App\Repository\ComicChapterDestinationLinkRepository;
+use App\Repository\ComicChapterProviderRepository;
 use App\Repository\ComicChapterRepository;
-use App\Repository\ComicDestinationLinkRepository;
+use App\Repository\ComicProviderRepository;
 use App\Repository\LanguageRepository;
-use App\Repository\LinkItemLanguageRepository;
-use App\Repository\LinkRepository;
-use App\Repository\WebsiteItemLanguageRepository;
+use App\Util\StringUtil;
 
 class ComicBagiApp
 {
     public function __construct(
         private readonly LanguageRepository $languageRepository,
-        private readonly WebsiteItemLanguageRepository $websiteItemLanguageRepository,
-        private readonly LinkRepository $linkRepository,
-        private readonly LinkItemLanguageRepository $linkItemLanguageRepository,
-        private readonly ComicDestinationLinkRepository $comicDestinationLinkRepository,
+        private readonly ComicProviderRepository $comicProviderRepository,
         private readonly ComicChapterRepository $comicChapterRepository,
-        private readonly ComicChapterDestinationLinkRepository $comicChapterDestinationLinkRepository
+        private readonly ComicChapterProviderRepository $comicChapterProviderRepository
     ) {}
 
     public function getLanguages(
@@ -33,48 +28,20 @@ class ComicBagiApp
         );
     }
 
-    public function getWebsiteItemLanguages(
-        string $host,
-        ?int $limit = null
-    ): array {
-        return $this->websiteItemLanguageRepository->findByCustom(
-            ['websiteHosts' => [$host]],
-            [],
-            $limit
-        );
-    }
-
-    public function getLinkItemLanguages(
-        string $websiteHost,
-        ?string $relativeReference,
-        ?int $limit = null
-    ): array {
-        return $this->linkItemLanguageRepository->findByCustom(
-            [
-                'linkWebsiteHosts' => [$websiteHost],
-                'linkRelativeReferences' => [$relativeReference ?? '']
-            ],
-            [],
-            $limit
-        );
-    }
-
-    public function getLinksByComic(
+    public function getComicProviders(
         string $comicCode,
         ?array $langs = [],
-        ?int $limit = null
+        ?int $limit = null,
+        ?array $customUnredacts = []
     ): array {
         if (!$langs) {
             $langs = ['en'];
         }
 
-        $result0 = $this->comicDestinationLinkRepository->findByCustom(
+        $result = $this->comicProviderRepository->findByCustom(
             ['comicCodes' => [$comicCode]],
             [
-                new OrderByDto('linkItemLanguageLang', custom: [
-                    'prefer' => \implode('+', $langs)
-                ]),
-                new OrderByDto('linkWebsiteItemLanguageLang', custom: [
+                new OrderByDto('languageLang', custom: [
                     'prefer' => \implode('+', $langs)
                 ]),
                 new OrderByDto('linkWebsiteName'),
@@ -84,86 +51,16 @@ class ComicBagiApp
             $limit
         );
 
-        $result1 = $this->linkRepository->findByCustom(
-            ['hrefs' => \array_map(function ($val) {
-                return $val->getLinkWebsiteHost() . $val->getLinkRelativeReference();
-            }, $result0)],
-            [],
-            null
-        );
-
-        $result = [];
-        foreach ($result0 as $val0) {
-            foreach ($result1 as $val1) {
-                if ($val1->getWebsiteHost() != $val0->getLinkWebsiteHost()) {
-                    continue;
-                }
-
-                if ($val1->getRelativeReference() != $val0->getLinkRelativeReference()) {
-                    continue;
-                }
-
-                \array_push($result, $val1);
-                break;
+        foreach ($result as $v) {
+            $v1 = $v->getLink()->getWebsite();
+            if ($v1->isRedacted() && !\in_array($v1->getHost(), $customUnredacts)) {
+                $v1->setHost(StringUtil::redact($v1->getHost(), 2, ['.']));
+                $v1->setName(StringUtil::redact($v1->getName(), 2));
+            } else {
+                $v1->setRedacted(false);
             }
         }
-        return $result;
-    }
 
-    public function getLinksByComicChapter(
-        string $comicCode,
-        string $chapterNumber,
-        ?string $chapterVersion,
-        ?array $langs = [],
-        ?int $limit = null
-    ): array {
-        if (!$langs) {
-            $langs = ['en'];
-        }
-
-        $result0 = $this->comicChapterDestinationLinkRepository->findByCustom(
-            [
-                'chapterComicCodes' => [$comicCode],
-                'chapterNumbers' => [$chapterNumber],
-                'chapterVersions' => [$chapterVersion ?? '']
-            ],
-            [
-                new OrderByDto('linkItemLanguageLang', custom: [
-                    'prefer' => \implode('+', $langs)
-                ]),
-                new OrderByDto('linkWebsiteItemLanguageLang', custom: [
-                    'prefer' => \implode('+', $langs)
-                ]),
-                new OrderByDto('linkWebsiteName'),
-                new OrderByDto('linkWebsiteHost'),
-                new OrderByDto('linkRelativeReference')
-            ],
-            $limit
-        );
-
-        $result1 = $this->linkRepository->findByCustom(
-            ['hrefs' => \array_map(function ($val) {
-                return $val->getLinkWebsiteHost() . $val->getLinkRelativeReference();
-            }, $result0)],
-            [],
-            null
-        );
-
-        $result = [];
-        foreach ($result0 as $val0) {
-            foreach ($result1 as $val1) {
-                if ($val1->getWebsiteHost() != $val0->getLinkWebsiteHost()) {
-                    continue;
-                }
-
-                if ($val1->getRelativeReference() != $val0->getLinkRelativeReference()) {
-                    continue;
-                }
-
-                \array_push($result, $val1);
-                break;
-            }
-        }
         return $result;
     }
 
@@ -181,6 +78,48 @@ class ComicBagiApp
             $limit,
             $offset
         );
+    }
+
+    public function getComicChapterProviders(
+        string $comicCode,
+        string $chapterNumber,
+        ?string $chapterVersion,
+        ?array $langs = [],
+        ?int $limit = null,
+        ?array $customUnredacts = []
+    ): array {
+        if (!$langs) {
+            $langs = ['en'];
+        }
+
+        $result = $this->comicChapterProviderRepository->findByCustom(
+            [
+                'chapterComicCodes' => [$comicCode],
+                'chapterNumbers' => [$chapterNumber],
+                'chapterVersions' => [$chapterVersion ?? '']
+            ],
+            [
+                new OrderByDto('languageLang', custom: [
+                    'prefer' => \implode('+', $langs)
+                ]),
+                new OrderByDto('linkWebsiteName'),
+                new OrderByDto('linkWebsiteHost'),
+                new OrderByDto('linkRelativeReference')
+            ],
+            $limit
+        );
+
+        foreach ($result as $v) {
+            $v1 = $v->getLink()->getWebsite();
+            if ($v1->isRedacted() && !\in_array($v1->getHost(), $customUnredacts)) {
+                $v1->setHost(StringUtil::redact($v1->getHost(), 2, ['.']));
+                $v1->setName(StringUtil::redact($v1->getName(), 2));
+            } else {
+                $v1->setRedacted(false);
+            }
+        }
+
+        return $result;
     }
 
     public function getRecommendedLangs(

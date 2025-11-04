@@ -31,4 +31,28 @@ class StringUtil
     {
         return SymfonyString\u($string)->trimPrefix($prefix);
     }
+
+    public static function redact(string $string, int $num = 3, array $sep = [' ']): string
+    {
+        $s = 0;
+        for ($i = 0; $i < \strlen($string); $i++) {
+            if (\in_array($string[$i], $sep)) {
+                $s = 0;
+                continue;
+            }
+
+            $s += 1;
+
+            if ($s <= $num) {
+                continue;
+            }
+
+            if ($s >= $num * 2) {
+                $s = 0;
+            }
+
+            $string[$i] = '*';
+        }
+        return $string;
+    }
 }

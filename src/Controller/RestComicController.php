@@ -34,19 +34,15 @@ class RestComicController extends AbstractController
         Request $request,
         #[HttpKernel\MapQueryParameter(options: ['min_range' => 1])] int $page = 1,
         #[HttpKernel\MapQueryParameter(options: ['min_range' => 1, 'max_range' => 15])] int $limit = 10,
-        #[HttpKernel\MapQueryParameter] string $order = null
+        #[HttpKernel\MapQueryParameter] string | null $order = null
     ): Response {
         $queries = new UrlQuery($request->server->get('QUERY_STRING'));
 
         $criteria = [];
-        $criteria['destinationLinks'] = \array_map(function (string $val) {
-            $queries = new UrlQuery($val);
-            $externals = [];
-            $externals['linkWebsiteHosts'] = $queries->all('linkWebsiteHost', 'linkWebsiteHosts');
-            $externals['linkRelativeReferences'] = $queries->all('linkRelativeReference', 'linkRelativeReferences');
-            $externals['linkHREFs'] = $queries->all('linkHREF', 'linkHREFs');
-            return $externals;
-        }, $queries->all('destinationLink', 'destinationLinks'));
+        $criteria['providerLinkWebsiteHosts'] = $queries->all('providerLinkWebsiteHost', 'providerLinkWebsiteHosts');
+        $criteria['providerLinkRelativeReferences'] = $queries->all('providerLinkRelativeReference', 'providerLinkRelativeReferences');
+        $criteria['providerLinkHREFs'] = $queries->all('providerLinkHREF', 'providerLinkHREFs');
+        $criteria['providerLanguageLangs'] = $queries->all('providerLanguageLang', 'providerLanguageLangs');
         $orderBy = \array_map([OrderByDto::class, 'parse'], $queries->all('orderBy', 'orderBys'));
         if ($order != null) {
             \array_unshift($orderBy, new OrderByDto('code', $order));

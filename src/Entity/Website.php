@@ -31,7 +31,7 @@ class Website
     #[Serializer\Groups(['website'])]
     private ?\DateTimeImmutable $updatedAt = null;
 
-    #[ORM\Column(length: 64, unique: true)]
+    #[ORM\Column(length: 64, unique: true, options: ['collation' => 'utf8mb4_bin'])]
     #[Assert\NotNull, Assert\Length(max: 64)]
     #[Serializer\Groups(['website'])]
     private ?string $host = null;
@@ -41,12 +41,9 @@ class Website
     #[Serializer\Groups(['website'])]
     private ?string $name = null;
 
-    /**
-     * @var Collection<int, WebsiteItemLanguage>
-     */
-    #[ORM\OneToMany(targetEntity: WebsiteItemLanguage::class, mappedBy: 'website', fetch: 'EXTRA_LAZY')]
-    #[ORM\Cache(usage: 'NONSTRICT_READ_WRITE')]
-    private Collection $itemLanguages;
+    #[ORM\Column(options: ['default' => false])]
+    #[Serializer\Groups(['website'])]
+    private ?bool $redacted = null;
 
     /**
      * @var Collection<int, Link>
@@ -57,7 +54,6 @@ class Website
 
     public function __construct()
     {
-        $this->itemLanguages = new ArrayCollection();
         $this->links = new ArrayCollection();
     }
 
@@ -126,38 +122,14 @@ class Website
         return $this;
     }
 
-    /**
-     * @return Collection<int, WebsiteItemLanguage>
-     */
-    public function getItemLanguages(): Collection
+    public function isRedacted(): ?bool
     {
-        return $this->itemLanguages;
+        return $this->redacted;
     }
 
-    #[Serializer\Groups(['website'])]
-    public function getItemLanguageCount(): ?int
+    public function setRedacted(bool $redacted): static
     {
-        return $this->itemLanguages->count();
-    }
-
-    public function addItemLanguage(WebsiteItemLanguage $itemLanguage): static
-    {
-        if (!$this->itemLanguages->contains($itemLanguage)) {
-            $this->itemLanguages->add($itemLanguage);
-            $itemLanguage->setWebsite($this);
-        }
-
-        return $this;
-    }
-
-    public function removeItemLanguage(WebsiteItemLanguage $itemLanguage): static
-    {
-        if ($this->itemLanguages->removeElement($itemLanguage)) {
-            // set the owning side to null (unless already changed)
-            if ($itemLanguage->getWebsite() === $this) {
-                $itemLanguage->setWebsite(null);
-            }
-        }
+        $this->redacted = $redacted;
 
         return $this;
     }

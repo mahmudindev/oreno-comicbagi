@@ -8,11 +8,13 @@
                 {% for chapter in comic_chapters %}
                     <div class="col">
                         <div class="border">
-                            {% set links = funcComicBagiApp.linksByComicChapter(
+                            {% set links = funcComicBagiApp.comicChapterProviders(
                                 result.code,
                                 chapter.number,
                                 chapter.version,
-                                rec_langs
+                                rec_langs,
+                                null,
+                                unredacts
                             ) %}
 
                             <button

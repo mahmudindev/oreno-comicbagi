@@ -48,15 +48,15 @@ class ComicChapter
     private ?string $version = null;
 
     /**
-     * @var Collection<int, ComicChapterDestinationLink>
+     * @var Collection<int, ComicChapterProvider>
      */
-    #[ORM\OneToMany(targetEntity: ComicChapterDestinationLink::class, mappedBy: 'chapter')]
+    #[ORM\OneToMany(targetEntity: ComicChapterProvider::class, mappedBy: 'chapter')]
     #[ORM\Cache(usage: 'NONSTRICT_READ_WRITE')]
-    private Collection $destinationLinks;
+    private Collection $providers;
 
     public function __construct()
     {
-        $this->destinationLinks = new ArrayCollection();
+        $this->providers = new ArrayCollection();
     }
 
     #[ORM\PrePersist]
@@ -140,10 +140,6 @@ class ComicChapter
 
     public function getVersion(): ?string
     {
-        if ($this->version == '') {
-            return null;
-        }
-
         return $this->version;
     }
 
@@ -155,35 +151,35 @@ class ComicChapter
     }
 
     /**
-     * @return Collection<int, ComicChapterDestinationLink>
+     * @return Collection<int, ComicChapterProvider>
      */
-    public function getDestinationLinks(): Collection
+    public function getProviders(): Collection
     {
-        return $this->destinationLinks;
+        return $this->providers;
     }
 
     #[Serializer\Groups(['comic', 'comicChapter'])]
-    public function getDestinationLinkCount(): ?int
+    public function getProviderCount(): ?int
     {
-        return $this->destinationLinks->count();
+        return $this->providers->count();
     }
 
-    public function addDestinationLink(ComicChapterDestinationLink $destinationLink): static
+    public function addProvider(ComicChapterProvider $provider): static
     {
-        if (!$this->destinationLinks->contains($destinationLink)) {
-            $this->destinationLinks->add($destinationLink);
-            $destinationLink->setChapter($this);
+        if (!$this->providers->contains($provider)) {
+            $this->providers->add($provider);
+            $provider->setChapter($this);
         }
 
         return $this;
     }
 
-    public function removeDestinationLink(ComicChapterDestinationLink $destinationLink): static
+    public function removeProvider(ComicChapterProvider $provider): static
     {
-        if ($this->destinationLinks->removeElement($destinationLink)) {
+        if ($this->providers->removeElement($provider)) {
             // set the owning side to null (unless already changed)
-            if ($destinationLink->getChapter() === $this) {
-                $destinationLink->setChapter(null);
+            if ($provider->getChapter() === $this) {
+                $provider->setChapter(null);
             }
         }
 

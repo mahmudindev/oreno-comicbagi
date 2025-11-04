@@ -11,7 +11,7 @@
         <div class="bg-dark shadow" style="height: var(--comic-card-h);">
             {% set comic_covers = funcComicKingApi.comicCovers(comic.code, [], 1) %}
             {% if comic_covers|length > 0 %}
-                {% set comic_cover = comic_covers[0] %}
+                {% set comic_cover = funcComicKingApi.image(comic_covers[0].imageULID) %}
             {% else %}
                 {% set comic_cover = null %}
             {% endif %}
@@ -33,7 +33,7 @@
         {% set comic_chapters = funcComicBagiApp.comicChapters(comic.code, 2) %}
 
         {% for i in 0..1 %}
-            {% set comic_chapter_name = 'X' %}
+            {% set comic_chapter_name = 'XXX' %}
 
             {% if comic_chapters[i] is defined %}
                 {% set comic_chapter_name = comic_chapters[i].number %}

@@ -33,13 +33,14 @@ class WebsiteRepository extends ServiceEntityRepository
             foreach ($orderBy as $key => $val) {
                 if (!($val instanceof OrderByDto)) continue;
 
-                if ($key > 4) break;
+                if ($key > 5) break;
 
                 switch ($val->name) {
                     case 'createdAt':
                     case 'updatedAt':
                     case 'host':
                     case 'name':
+                    case 'redacted':
                         $val->name = 'w.' . $val->name;
                         break;
                     default:

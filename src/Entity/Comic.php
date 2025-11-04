@@ -37,11 +37,11 @@ class Comic
     private ?string $code = null;
 
     /**
-     * @var Collection<int, ComicDestinationLink>
+     * @var Collection<int, ComicProvider>
      */
-    #[ORM\OneToMany(targetEntity: ComicDestinationLink::class, mappedBy: 'comic', fetch: 'EXTRA_LAZY')]
+    #[ORM\OneToMany(targetEntity: ComicProvider::class, mappedBy: 'comic', fetch: 'EXTRA_LAZY')]
     #[ORM\Cache(usage: 'NONSTRICT_READ_WRITE')]
-    private Collection $destinationLinks;
+    private Collection $providers;
 
     /**
      * @var Collection<int, ComicChapter>
@@ -52,7 +52,7 @@ class Comic
 
     public function __construct()
     {
-        $this->destinationLinks = new ArrayCollection();
+        $this->providers = new ArrayCollection();
         $this->chapters = new ArrayCollection();
     }
 
@@ -110,35 +110,35 @@ class Comic
     }
 
     /**
-     * @return Collection<int, ComicDestinationLink>
+     * @return Collection<int, ComicProvider>
      */
-    public function getDestinationLinks(): Collection
+    public function getProviders(): Collection
     {
-        return $this->destinationLinks;
+        return $this->providers;
     }
 
     #[Serializer\Groups(['comic'])]
-    public function getDestinationLinkCount(): ?int
+    public function getProviderCount(): ?int
     {
-        return $this->destinationLinks->count();
+        return $this->providers->count();
     }
 
-    public function addDestinationLink(ComicDestinationLink $destinationLink): static
+    public function addProvider(ComicProvider $provider): static
     {
-        if (!$this->destinationLinks->contains($destinationLink)) {
-            $this->destinationLinks->add($destinationLink);
-            $destinationLink->setComic($this);
+        if (!$this->providers->contains($provider)) {
+            $this->providers->add($provider);
+            $provider->setComic($this);
         }
 
         return $this;
     }
 
-    public function removeDestinationLink(ComicDestinationLink $destinationLink): static
+    public function removeProvider(ComicProvider $provider): static
     {
-        if ($this->destinationLinks->removeElement($destinationLink)) {
+        if ($this->providers->removeElement($provider)) {
             // set the owning side to null (unless already changed)
-            if ($destinationLink->getComic() === $this) {
-                $destinationLink->setComic(null);
+            if ($provider->getComic() === $this) {
+                $provider->setComic(null);
             }
         }
 

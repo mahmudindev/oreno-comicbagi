@@ -3,8 +3,6 @@
 namespace App\Entity;
 
 use App\Repository\LinkRepository;
-use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Event\PrePersistEventArgs;
 use Doctrine\ORM\Event\PreUpdateEventArgs;
@@ -37,38 +35,22 @@ class Link
     #[Assert\NotNull]
     private ?Website $website = null;
 
-    #[ORM\Column(length: 255, options: ['default' => '', 'collation' => 'utf8mb4_bin'])]
+    #[ORM\Column(length: 255, options: ['default' => '/', 'collation' => 'utf8mb4_bin'])]
     #[Assert\Length(min: 1, max: 255)]
-    #[Assert\Regex('/^\/|\?|#/')]
+    #[Assert\Regex('/^\//')]
     #[Serializer\Groups(['link'])]
     private ?string $relativeReference = null;
-
-    /**
-     * @var Collection<int, LinkItemLanguage>
-     */
-    #[ORM\OneToMany(targetEntity: LinkItemLanguage::class, mappedBy: 'link', fetch: 'EXTRA_LAZY')]
-    #[ORM\Cache(usage: 'NONSTRICT_READ_WRITE')]
-    private Collection $itemLanguages;
-
-    public function __construct()
-    {
-        $this->itemLanguages = new ArrayCollection();
-    }
 
     #[ORM\PrePersist]
     public function onPrePersist(PrePersistEventArgs $args)
     {
         $this->setCreatedAt(new \DateTimeImmutable());
-
-        if ($this->relativeReference == null) $this->setRelativeReference('');
     }
 
     #[ORM\PreUpdate]
     public function onPreUpdate(PreUpdateEventArgs $args)
     {
         $this->setUpdatedAt(new \DateTimeImmutable());
-
-        if ($this->relativeReference == null) $this->setRelativeReference('');
     }
 
     public function getId(): ?int
@@ -125,6 +107,16 @@ class Link
         return $this->website->getName();
     }
 
+    #[Serializer\Groups(['link'])]
+    public function isWebsiteRedacted(): ?bool
+    {
+        if ($this->website == null) {
+            return null;
+        }
+
+        return $this->website->isRedacted();
+    }
+
     public function setWebsite(?Website $website): static
     {
         $this->website = $website;
@@ -134,52 +126,12 @@ class Link
 
     public function getRelativeReference(): ?string
     {
-        if ($this->relativeReference == '') {
-            return null;
-        }
-
         return $this->relativeReference;
     }
 
     public function setRelativeReference(?string $relativeReference): static
     {
         $this->relativeReference = $relativeReference;
-
-        return $this;
-    }
-
-    /**
-     * @return Collection<int, LinkItemLanguage>
-     */
-    public function getItemLanguages(): Collection
-    {
-        return $this->itemLanguages;
-    }
-
-    #[Serializer\Groups(['link'])]
-    public function getItemLanguageCount(): ?int
-    {
-        return $this->itemLanguages->count();
-    }
-
-    public function addItemLanguage(LinkItemLanguage $itemLanguage): static
-    {
-        if (!$this->itemLanguages->contains($itemLanguage)) {
-            $this->itemLanguages->add($itemLanguage);
-            $itemLanguage->setLink($this);
-        }
-
-        return $this;
-    }
-
-    public function removeItemLanguage(LinkItemLanguage $itemLanguage): static
-    {
-        if ($this->itemLanguages->removeElement($itemLanguage)) {
-            // set the owning side to null (unless already changed)
-            if ($itemLanguage->getLink() === $this) {
-                $itemLanguage->setLink(null);
-            }
-        }
 
         return $this;
     }

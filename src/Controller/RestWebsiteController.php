@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\Website;
 use App\Model\OrderByDto;
 use App\Repository\WebsiteRepository;
+use App\Util\StringUtil;
 use App\Util\UrlQuery;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -34,7 +35,7 @@ class RestWebsiteController extends AbstractController
         Request $request,
         #[HttpKernel\MapQueryParameter(options: ['min_range' => 1])] int $page = 1,
         #[HttpKernel\MapQueryParameter(options: ['min_range' => 1, 'max_range' => 30])] int $limit = 10,
-        #[HttpKernel\MapQueryParameter] string $order = null
+        #[HttpKernel\MapQueryParameter] string | null $order = null
     ): Response {
         $queries = new UrlQuery($request->server->get('QUERY_STRING'));
 
@@ -50,6 +51,16 @@ class RestWebsiteController extends AbstractController
         $headers = [];
         $headers['X-Total-Count'] = $this->websiteRepository->countCustom($criteria);
         $headers['X-Pagination-Limit'] = $limit;
+
+        $customUnredacts = $queries->all('unredact', 'unredacts');
+        foreach ($result as $v) {
+            if ($v->isRedacted() && !\in_array($v->getHost(), $customUnredacts)) {
+                $v->setHost(StringUtil::redact($v->getHost(), 2, ['.']));
+                $v->setName(StringUtil::redact($v->getName(), 2));
+            } else {
+                $v->setRedacted(false);
+            }
+        }
 
         $response = $this->json($result, Response::HTTP_OK, $headers, ['groups' => ['website']]);
 
@@ -77,6 +88,7 @@ class RestWebsiteController extends AbstractController
                 $content = \json_decode($request->getContent(), true);
                 if (isset($content['host'])) $result->setHost($content['host']);
                 if (isset($content['name'])) $result->setName($content['name']);
+                if (isset($content['redacted'])) $result->setRedacted($content['redacted']);
                 break;
             default:
                 throw new UnsupportedMediaTypeHttpException();
@@ -122,6 +134,7 @@ class RestWebsiteController extends AbstractController
                 $content = \json_decode($request->getContent(), true);
                 if (isset($content['host'])) $result->setHost($content['host']);
                 if (isset($content['name'])) $result->setName($content['name']);
+                if (isset($content['redacted'])) $result->setRedacted($content['redacted']);
                 break;
             default:
                 throw new UnsupportedMediaTypeHttpException();

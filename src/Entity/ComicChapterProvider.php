@@ -2,7 +2,7 @@
 
 namespace App\Entity;
 
-use App\Repository\ComicDestinationLinkRepository;
+use App\Repository\ComicChapterProviderRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Event\PrePersistEventArgs;
 use Doctrine\ORM\Event\PreUpdateEventArgs;
@@ -11,13 +11,12 @@ use Symfony\Component\Serializer\Annotation as Serializer;
 use Symfony\Component\Uid\Ulid;
 use Symfony\Component\Validator\Constraints as Assert;
 
-#[ORM\Entity(repositoryClass: ComicDestinationLinkRepository::class)]
-#[ORM\Table(name: 'comic_destination_link')]
-#[ORM\UniqueConstraint(columns: ['comic_id', 'ulid'])]
-#[ORM\UniqueConstraint(columns: ['comic_id', 'link_id'])]
+#[ORM\Entity(repositoryClass: ComicChapterProviderRepository::class)]
+#[ORM\Table(name: 'comic_chapter_provider')]
+#[ORM\UniqueConstraint(columns: ['chapter_id', 'ulid'])]
 #[ORM\HasLifecycleCallbacks]
 #[ORM\Cache(usage: 'NONSTRICT_READ_WRITE')]
-class ComicDestinationLink
+class ComicChapterProvider
 {
     #[ORM\Id]
     #[ORM\GeneratedValue(strategy: 'IDENTITY')]
@@ -25,20 +24,19 @@ class ComicDestinationLink
     private ?int $id = null;
 
     #[ORM\Column(type: Types::DATETIMETZ_IMMUTABLE)]
-    #[Serializer\Groups(['comic', 'comicDestinationLink'])]
+    #[Serializer\Groups(['comic', 'comicChapter', 'comicChapterProvider'])]
     private ?\DateTimeImmutable $createdAt = null;
 
     #[ORM\Column(type: Types::DATETIMETZ_IMMUTABLE, nullable: true)]
-    #[Serializer\Groups(['comic', 'comicDestinationLink'])]
+    #[Serializer\Groups(['comic', 'comicChapter', 'comicChapterProvider'])]
     private ?\DateTimeImmutable $updatedAt = null;
 
-    #[ORM\ManyToOne(inversedBy: 'destinationLinks')]
-    #[ORM\JoinColumn(name: 'comic_id', nullable: false, onDelete: 'CASCADE')]
-    #[Assert\NotNull]
-    private ?Comic $comic = null;
+    #[ORM\ManyToOne(inversedBy: 'providers')]
+    #[ORM\JoinColumn(name: 'chapter_id', nullable: false, onDelete: 'CASCADE')]
+    private ?ComicChapter $chapter = null;
 
     #[ORM\Column(type: 'ulid')]
-    #[Serializer\Groups(['comic', 'comicDestinationLink'])]
+    #[Serializer\Groups(['comic', 'comicChapter', 'comicChapterProvider'])]
     private ?Ulid $ulid = null;
 
     #[ORM\ManyToOne]
@@ -46,8 +44,12 @@ class ComicDestinationLink
     #[Assert\NotNull]
     private ?Link $link = null;
 
+    #[ORM\ManyToOne]
+    #[ORM\JoinColumn(name: 'language_id', onDelete: 'CASCADE')]
+    private ?Language $language = null;
+
     #[ORM\Column(type: Types::DATETIMETZ_IMMUTABLE, nullable: true)]
-    #[Serializer\Groups(['comic', 'comicDestinationLink'])]
+    #[Serializer\Groups(['comic', 'comicChapter', 'comicChapterProvider'])]
     private ?\DateTimeImmutable $releasedAt = null;
 
     #[ORM\PrePersist]
@@ -92,24 +94,44 @@ class ComicDestinationLink
         return $this;
     }
 
-    public function getComic(): ?Comic
+    public function getChapter(): ?ComicChapter
     {
-        return $this->comic;
+        return $this->chapter;
     }
 
-    #[Serializer\Groups(['comicDestinationLink'])]
-    public function getComicCode(): ?string
+    #[Serializer\Groups(['comicChapterProvider'])]
+    public function getChapterComicCode(): ?string
     {
-        if ($this->comic == null) {
+        if ($this->chapter == null) {
             return null;
         }
 
-        return $this->comic->getCode();
+        return $this->chapter->getComicCode();
     }
 
-    public function setComic(?Comic $comic): static
+    #[Serializer\Groups(['comicChapterProvider'])]
+    public function getChapterNumber(): ?float
     {
-        $this->comic = $comic;
+        if ($this->chapter == null) {
+            return null;
+        }
+
+        return $this->chapter->getNumber();
+    }
+
+    #[Serializer\Groups(['comicChapterProvider'])]
+    public function getChapterVersion(): ?string
+    {
+        if ($this->chapter == null) {
+            return null;
+        }
+
+        return $this->chapter->getVersion();
+    }
+
+    public function setChapter(?ComicChapter $chapter): static
+    {
+        $this->chapter = $chapter;
 
         return $this;
     }
@@ -131,7 +153,7 @@ class ComicDestinationLink
         return $this->link;
     }
 
-    #[Serializer\Groups(['comic', 'comicDestinationLink'])]
+    #[Serializer\Groups(['comic', 'comicChapter', 'comicChapterProvider'])]
     public function getLinkWebsiteHost(): ?string
     {
         if ($this->link == null) {
@@ -141,7 +163,7 @@ class ComicDestinationLink
         return $this->link->getWebsiteHost();
     }
 
-    #[Serializer\Groups(['comic', 'comicDestinationLink'])]
+    #[Serializer\Groups(['comic', 'comicChapter', 'comicChapterProvider'])]
     public function getLinkWebsiteName(): ?string
     {
         if ($this->link == null) {
@@ -151,7 +173,17 @@ class ComicDestinationLink
         return $this->link->getWebsiteName();
     }
 
-    #[Serializer\Groups(['comic', 'comicDestinationLink'])]
+    #[Serializer\Groups(['comic', 'comicChapter', 'comicChapterProvider'])]
+    public function isLinkWebsiteRedacted(): ?bool
+    {
+        if ($this->link == null) {
+            return null;
+        }
+
+        return $this->link->isWebsiteRedacted();
+    }
+
+    #[Serializer\Groups(['comic', 'comicChapter', 'comicChapterProvider'])]
     public function getLinkRelativeReference(): ?string
     {
         if ($this->link == null) {
@@ -164,6 +196,28 @@ class ComicDestinationLink
     public function setLink(?Link $link): static
     {
         $this->link = $link;
+
+        return $this;
+    }
+
+    public function getLanguage(): ?Language
+    {
+        return $this->language;
+    }
+
+    #[Serializer\Groups(['comic', 'comicChapter', 'comicChapterProvider'])]
+    public function getLanguageLang(): ?string
+    {
+        if ($this->language == null) {
+            return null;
+        }
+
+        return $this->language->getLang();
+    }
+
+    public function setLanguage(?Language $language): static
+    {
+        $this->language = $language;
 
         return $this;
     }

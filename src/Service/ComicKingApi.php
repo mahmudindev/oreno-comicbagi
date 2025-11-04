@@ -148,4 +148,22 @@ class ComicKingApi
             }
         );
     }
+
+    public function getImage(
+        string $ulid
+    ): array {
+        return $this->cacheItem->get(
+            'api.comicking.image.' . $ulid,
+            function (ItemInterface $item) use ($ulid): mixed {
+                $item->expiresAfter(28800);
+                $item->tag(['image']);
+
+                $url = $this->base . '/rest/images/' . $ulid;
+
+                $response = $this->client->request(Request::METHOD_GET, $url);
+
+                return $response->toArray(true);
+            }
+        );
+    }
 }

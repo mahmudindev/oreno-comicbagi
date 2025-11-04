@@ -2,12 +2,14 @@
 
 namespace App\Controller;
 
-use App\Entity\ComicDestinationLink;
+use App\Entity\ComicProvider;
 use App\Model\OrderByDto;
-use App\Repository\ComicDestinationLinkRepository;
+use App\Repository\ComicProviderRepository;
 use App\Repository\ComicRepository;
+use App\Repository\LanguageRepository;
 use App\Repository\LinkRepository;
 use App\Repository\WebsiteRepository;
+use App\Util\StringUtil;
 use App\Util\UrlQuery;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -23,18 +25,19 @@ use Symfony\Component\Validator\Exception\ValidationFailedException;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 #[Routing\Route(
-    path: '/api/rest/comics/{comicCode}/destination-links',
-    name: 'rest_comic_destination_link_'
+    path: '/api/rest/comics/{comicCode}/providers',
+    name: 'rest_comic_provider_'
 )]
-class RestComicDestinationLinkController extends AbstractController
+class RestComicProviderController extends AbstractController
 {
     public function __construct(
         private readonly ValidatorInterface $validator,
         private readonly EntityManagerInterface $entityManager,
         private readonly ComicRepository $comicRepository,
-        private readonly ComicDestinationLinkRepository $comicDestinationLinkRepository,
+        private readonly ComicProviderRepository $comicProviderRepository,
         private readonly LinkRepository $linkRepository,
-        private readonly WebsiteRepository $websiteRepository
+        private readonly WebsiteRepository $websiteRepository,
+        private readonly LanguageRepository $languageRepository
     ) {}
 
     #[Routing\Route('', name: 'list', methods: [Request::METHOD_GET])]
@@ -43,7 +46,7 @@ class RestComicDestinationLinkController extends AbstractController
         string $comicCode,
         #[HttpKernel\MapQueryParameter(options: ['min_range' => 1])] int $page = 1,
         #[HttpKernel\MapQueryParameter(options: ['min_range' => 1, 'max_range' => 30])] int $limit = 10,
-        #[HttpKernel\MapQueryParameter] string $order = null
+        #[HttpKernel\MapQueryParameter] string | null $order = null
     ): Response {
         $queries = new UrlQuery($request->server->get('QUERY_STRING'));
 
@@ -52,17 +55,29 @@ class RestComicDestinationLinkController extends AbstractController
         $criteria['linkWebsiteHosts'] = $queries->all('linkWebsiteHost', 'linkWebsiteHosts');
         $criteria['linkRelativeReferences'] = $queries->all('linkRelativeReference', 'linkRelativeReferences');
         $criteria['linkHREFs'] = $queries->all('linkHREF', 'linkHREFs');
+        $criteria['languageLangs'] = $queries->all('languageLang', 'languageLangs');
         $orderBy = \array_map([OrderByDto::class, 'parse'], $queries->all('orderBy', 'orderBys'));
         if ($order != null) {
             \array_unshift($orderBy, new OrderByDto('ulid', $order));
         }
         $offset = $limit * ($page - 1);
 
-        $result = $this->comicDestinationLinkRepository->findByCustom($criteria, $orderBy, $limit, $offset);
+        $result = $this->comicProviderRepository->findByCustom($criteria, $orderBy, $limit, $offset);
 
         $headers = [];
-        $headers['X-Total-Count'] = $this->comicDestinationLinkRepository->countCustom($criteria);
+        $headers['X-Total-Count'] = $this->comicProviderRepository->countCustom($criteria);
         $headers['X-Pagination-Limit'] = $limit;
+
+        $customUnredacts = $queries->all('unredact', 'unredacts');
+        foreach ($result as $v) {
+            $v1 = $v->getLink()->getWebsite();
+            if ($v1->isRedacted() && !\in_array($v1->getHost(), $customUnredacts)) {
+                $v1->setHost(StringUtil::redact($v1->getHost(), 2, ['.']));
+                $v1->setName(StringUtil::redact($v1->getName(), 2));
+            } else {
+                $v1->setRedacted(false);
+            }
+        }
 
         $response = $this->json($result, Response::HTTP_OK, $headers, ['groups' => ['comic']]);
 
@@ -87,7 +102,7 @@ class RestComicDestinationLinkController extends AbstractController
     ): Response {
         $parent = $this->comicRepository->findOneBy(['code' => $comicCode]);
         if (!$parent) throw new BadRequestException('Comic does not exists.');
-        $result = new ComicDestinationLink();
+        $result = new ComicProvider();
         switch ($request->headers->get('Content-Type')) {
             case 'application/json':
                 $content = \json_decode($request->getContent(), true);
@@ -96,15 +111,22 @@ class RestComicDestinationLinkController extends AbstractController
                         'website' => $this->websiteRepository->findOneBy([
                             'host' => $content['linkWebsiteHost']
                         ]),
-                        'relativeReference' => $content['linkRelativeReference'] ?? ''
+                        'relativeReference' => $content['linkRelativeReference'] ?? '/'
                     ]);
                     if (!$r1) throw new BadRequestException('Link does not exists.');
                     $result->setLink($r1);
                 }
+                if (isset($content['languageLang'])) {
+                    $r2 = $this->languageRepository->findOneBy([
+                        'lang' => $content['languageLang']
+                    ]);
+                    if (!$r2) throw new BadRequestException('Link does not exists.');
+                    $result->setLanguage($r2);
+                }
                 if (isset($content['releasedAt'])) {
-                    $r2 = \DateTimeImmutable::createFromFormat(\DateTimeImmutable::ATOM, $content['releasedAt']);
-                    if (!$r2) throw new BadRequestException('Released At could not be parsed.');
-                    $result->setReleasedAt($r2);
+                    $r3 = \DateTimeImmutable::createFromFormat(\DateTimeImmutable::ATOM, $content['releasedAt']);
+                    if (!$r3) throw new BadRequestException('Released At could not be parsed.');
+                    $result->setReleasedAt($r3);
                 }
                 break;
             default:
@@ -117,7 +139,7 @@ class RestComicDestinationLinkController extends AbstractController
         $this->entityManager->flush();
 
         $headers = [];
-        $headers['Location'] = $this->generateUrl('rest_comic_destination_link_get', [
+        $headers['Location'] = $this->generateUrl('rest_comic_provider_get', [
             'comicCode' => $result->getComicCode(),
             'ulid' => $result->getUlid()
         ]);
@@ -131,11 +153,11 @@ class RestComicDestinationLinkController extends AbstractController
         string $comicCode,
         Ulid $ulid
     ): Response {
-        $result = $this->comicDestinationLinkRepository->findOneBy([
+        $result = $this->comicProviderRepository->findOneBy([
             'comic' => $this->comicRepository->findOneBy(['code' => $comicCode]),
             'ulid' => $ulid
         ]);
-        if (!$result) throw new NotFoundHttpException('Comic Destination Link not found.');
+        if (!$result) throw new NotFoundHttpException('Comic Provider not found.');
 
         $response = $this->json($result, Response::HTTP_OK, [], ['groups' => ['comic']]);
 
@@ -153,11 +175,11 @@ class RestComicDestinationLinkController extends AbstractController
         string $comicCode,
         Ulid $ulid
     ): Response {
-        $result = $this->comicDestinationLinkRepository->findOneBy([
+        $result = $this->comicProviderRepository->findOneBy([
             'comic' => $this->comicRepository->findOneBy(['code' => $comicCode]),
             'ulid' => $ulid
         ]);
-        if (!$result) throw new NotFoundHttpException('Comic Destination Link not found.');
+        if (!$result) throw new NotFoundHttpException('Comic Provider not found.');
         switch ($request->headers->get('Content-Type')) {
             case 'application/json':
                 $content = \json_decode($request->getContent(), true);
@@ -166,15 +188,22 @@ class RestComicDestinationLinkController extends AbstractController
                         'website' => $this->websiteRepository->findOneBy([
                             'host' => $content['linkWebsiteHost']
                         ]),
-                        'relativeReference' => $content['linkRelativeReference'] ?? ''
+                        'relativeReference' => $content['linkRelativeReference'] ?? '/'
                     ]);
                     if (!$r1) throw new BadRequestException('Link does not exists.');
                     $result->setLink($r1);
                 }
+                if (isset($content['languageLang'])) {
+                    $r2 = $this->languageRepository->findOneBy([
+                        'lang' => $content['languageLang']
+                    ]);
+                    if (!$r2) throw new BadRequestException('Link does not exists.');
+                    $result->setLanguage($r2);
+                }
                 if (isset($content['releasedAt'])) {
-                    $r2 = \DateTimeImmutable::createFromFormat(\DateTimeImmutable::ATOM, $content['releasedAt']);
-                    if (!$r2) throw new BadRequestException('Released At could not be parsed.');
-                    $result->setReleasedAt($r2);
+                    $r3 = \DateTimeImmutable::createFromFormat(\DateTimeImmutable::ATOM, $content['releasedAt']);
+                    if (!$r3) throw new BadRequestException('Released At could not be parsed.');
+                    $result->setReleasedAt($r3);
                 }
                 break;
             default:
@@ -185,7 +214,7 @@ class RestComicDestinationLinkController extends AbstractController
         $this->entityManager->flush();
 
         $headers = [];
-        $headers['Location'] = $this->generateUrl('rest_comic_destination_link_get', [
+        $headers['Location'] = $this->generateUrl('rest_comic_provider_get', [
             'comicCode' => $result->getComicCode(),
             'ulid' => $result->getUlid()
         ]);
@@ -198,11 +227,11 @@ class RestComicDestinationLinkController extends AbstractController
         string $comicCode,
         Ulid $ulid
     ): Response {
-        $result = $this->comicDestinationLinkRepository->findOneBy([
+        $result = $this->comicProviderRepository->findOneBy([
             'comic' => $this->comicRepository->findOneBy(['code' => $comicCode]),
             'ulid' => $ulid
         ]);
-        if (!$result) throw new NotFoundHttpException('Comic Destination Link not found.');
+        if (!$result) throw new NotFoundHttpException('Comic Provider not found.');
         $this->entityManager->remove($result);
         $this->entityManager->flush();
 

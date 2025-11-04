@@ -30,19 +30,25 @@ class ComicRepository extends ServiceEntityRepository
         $q1 = false;
         $q1Func = function (bool &$c, QueryBuilder &$q): void {
             if ($c) return;
-            $q->leftJoin('c.destinationLinks', 'cd2');
+            $q->leftJoin('c.providers', 'cp2');
             $c = true;
         };
         $q11 = false;
         $q11Func = function (bool &$c, QueryBuilder &$q): void {
             if ($c) return;
-            $q->leftJoin('cd2.link', 'cd2l');
+            $q->leftJoin('cp2.link', 'cp2l');
             $c = true;
         };
         $q111 = false;
         $q111Func = function (bool &$c, QueryBuilder &$q): void {
             if ($c) return;
-            $q->leftJoin('cd2l.website', 'cd2lw');
+            $q->leftJoin('cp2l.website', 'cp2lw');
+            $c = true;
+        };
+        $q12 = false;
+        $q12Func = function (bool &$c, QueryBuilder &$q): void {
+            if ($c) return;
+            $q->leftJoin('cp2.language', 'cp2la');
             $c = true;
         };
         $q2 = false;
@@ -55,7 +61,7 @@ class ComicRepository extends ServiceEntityRepository
         $qZ = false;
         $qZFunc = function (bool &$c, QueryBuilder &$q): void {
             if ($c) return;
-            $q->addGroupBy('c.code');
+            $q->addGroupBy('c.id');
             $c = true;
         };
 
@@ -63,85 +69,72 @@ class ComicRepository extends ServiceEntityRepository
             $val = \array_unique($val);
 
             switch ($key) {
-                case 'destinationLinks':
+                case 'providerLinkWebsiteHosts':
                     $c = \count($val);
                     if ($c < 1) break;
 
                     $q1Func($q1, $query);
+                    $q11Func($q11, $query);
+                    $q111Func($q111, $query);
                     $qZFunc($qZ, $query);
 
-                    $w = [];
-                    foreach ($val as $v) {
-                        foreach ($v as $key => $val) {
-                            if (!isset($w[$key])) {
-                                $w[$key] = [];
-                            }
-                            \array_push($w[$key], ...$val);
-                        }
+                    if ($c == 1) {
+                        $query->andWhere('cp2lw.host = :providerLinkWebsiteHost');
+                        $query->setParameter('providerLinkWebsiteHost', $val[0]);
+                        break;
                     }
-                    if (\count($w) < 1) break;
+                    $query->andWhere('cp2lw.host IN (:providerLinkWebsiteHosts)');
+                    $query->setParameter('providerLinkWebsiteHosts', $val);
+                    break;
+                case 'providerLinkRelativeReferences':
+                    $c = \count($val);
+                    if ($c < 1) break;
 
-                    foreach ($w as $key => $val) {
-                        switch ($key) {
-                            case 'linkWebsiteHosts':
-                                $c = \count($val);
-                                if ($c < 1) break;
+                    $q1Func($q1, $query);
+                    $q11Func($q11, $query);
+                    $qZFunc($qZ, $query);
 
-                                $q11Func($q11, $query);
-                                $q111Func($q111, $query);
-
-                                if ($c == 1) {
-                                    $query->andWhere('cd2lw.host = :linkWebsiteHost');
-                                    $query->setParameter('linkWebsiteHost', $val[0]);
-                                    break;
-                                }
-                                $query->andWhere('cd2lw.host IN (:linkWebsiteHosts)');
-                                $query->setParameter('linkWebsiteHosts', $val);
-                                break;
-                            case 'linkRelativeReferences':
-                                $c = \count($val);
-                                if ($c < 1) break;
-
-                                $q11Func($q11, $query);
-
-                                foreach ($val as $k => $v) {
-                                    switch ($v) {
-                                        case null:
-                                            $val[$k] = '';
-                                            break;
-                                        case '':
-                                            $val[$k] = null;
-                                            break;
-                                    }
-                                }
-
-                                if ($c == 1) {
-                                    $query->andWhere('cd2l.relativeReference = :linkRelativeReference');
-                                    $query->setParameter('linkRelativeReference', $val[0]);
-                                    break;
-                                }
-                                $query->andWhere('cd2l.relativeReference IN (:linkRelativeReferences)');
-                                $query->setParameter('linkRelativeReferences', $val);
-                                break;
-                            case 'linkHREFs':
-                                $c = \count($val);
-                                if ($c < 1) break;
-
-                                $q11Func($q11, $query);
-                                $q111Func($q111, $query);
-
-                                $qExOr = $query->expr()->orX();
-                                foreach ($val as $k => $v) {
-                                    $href = new Href($v);
-
-                                    $qExOr->add('cd2lw.host = :linkHREFA' . $k . ' AND ' . 'cd2l.relativeReference = :linkHREFB' . $k);
-                                    $query->setParameter('linkHREFA' . $k, $href->getHost());
-                                    $query->setParameter('linkHREFB' . $k, $href->getRelativeReference() ?? '');
-                                }
-                                $query->andWhere($qExOr);
-                                break;
-                        }
+                    if ($c == 1) {
+                        $query->andWhere('cp2l.relativeReference = :providerLinkRelativeReference');
+                        $query->setParameter('providerLinkRelativeReference', $val[0]);
+                        break;
                     }
+                    $query->andWhere('cp2l.relativeReference IN (:providerLinkRelativeReferences)');
+                    $query->setParameter('providerLinkRelativeReferences', $val);
+                    break;
+                case 'providerLinkHREFs':
+                    $c = \count($val);
+                    if ($c < 1) break;
+
+                    $q1Func($q1, $query);
+                    $q11Func($q11, $query);
+                    $q111Func($q111, $query);
+                    $qZFunc($qZ, $query);
+
+                    $qExOr = $query->expr()->orX();
+                    foreach ($val as $k => $v) {
+                        $href = new Href($v);
+
+                        $qExOr->add('cp2lw.host = :providerLinkHREFA' . $k . ' AND ' . 'cp2l.relativeReference = :providerLinkHREFB' . $k);
+                        $query->setParameter('providerLinkHREFA' . $k, $href->getHost());
+                        $query->setParameter('providerLinkHREFB' . $k, $href->getRelativeReference() ?? '');
+                    }
+                    $query->andWhere($qExOr);
+                    break;
+                case 'providerLanguageLangs':
+                    $c = \count($val);
+                    if ($c < 1) break;
+
+                    $q1Func($q1, $query);
+                    $q12Func($q12, $query);
+
+                    if ($c == 1) {
+                        $query->andWhere('cp2la.lang = :providerLanguageLang');
+                        $query->setParameter('providerLanguageLang', $val[0]);
+                        break;
+                    }
+                    $query->andWhere('cp2la.lang IN (:providerLanguageLangs)');
+                    $query->setParameter('providerLanguageLangs', $val);
                     break;
             }
         }
@@ -223,19 +216,25 @@ class ComicRepository extends ServiceEntityRepository
         $q1 = false;
         $q1Func = function (bool &$c, QueryBuilder &$q): void {
             if ($c) return;
-            $q->leftJoin('c.destinationLinks', 'cd2');
+            $q->leftJoin('c.providers', 'cp2');
             $c = true;
         };
         $q11 = false;
         $q11Func = function (bool &$c, QueryBuilder &$q): void {
             if ($c) return;
-            $q->leftJoin('cd2.link', 'cd2l');
+            $q->leftJoin('cp2.link', 'cp2l');
             $c = true;
         };
         $q111 = false;
         $q111Func = function (bool &$c, QueryBuilder &$q): void {
             if ($c) return;
-            $q->leftJoin('cd2l.website', 'cd2lw');
+            $q->leftJoin('cp2l.website', 'cp2lw');
+            $c = true;
+        };
+        $q12 = false;
+        $q12Func = function (bool &$c, QueryBuilder &$q): void {
+            if ($c) return;
+            $q->leftJoin('cp2.language', 'cp2la');
             $c = true;
         };
 
@@ -243,84 +242,70 @@ class ComicRepository extends ServiceEntityRepository
             $val = \array_unique($val);
 
             switch ($key) {
-                case 'destinationLinks':
+
+                case 'providerLinkWebsiteHosts':
                     $c = \count($val);
                     if ($c < 1) break;
 
                     $q1Func($q1, $query);
+                    $q11Func($q11, $query);
+                    $q111Func($q111, $query);
 
-                    $w = [];
-                    foreach ($val as $v) {
-                        foreach ($v as $key => $val) {
-                            if (!isset($w[$key])) {
-                                $w[$key] = [];
-                            }
-                            \array_push($w[$key], ...$val);
-                        }
+                    if ($c == 1) {
+                        $query->andWhere('cp2lw.host = :providerLinkWebsiteHost');
+                        $query->setParameter('providerLinkWebsiteHost', $val[0]);
+                        break;
                     }
-                    if (\count($w) < 1) break;
+                    $query->andWhere('cp2lw.host IN (:providerLinkWebsiteHosts)');
+                    $query->setParameter('providerLinkWebsiteHosts', $val);
+                    break;
+                case 'providerLinkRelativeReferences':
+                    $c = \count($val);
+                    if ($c < 1) break;
 
-                    foreach ($w as $key => $val) {
-                        switch ($key) {
-                            case 'linkWebsiteHosts':
-                                $c = \count($val);
-                                if ($c < 1) break;
+                    $q1Func($q1, $query);
+                    $q11Func($q11, $query);
 
-                                $q11Func($q11, $query);
-                                $q111Func($q111, $query);
-
-                                if ($c == 1) {
-                                    $query->andWhere('cd2lw.host = :linkWebsiteHost');
-                                    $query->setParameter('linkWebsiteHost', $val[0]);
-                                    break;
-                                }
-                                $query->andWhere('cd2lw.host IN (:linkWebsiteHosts)');
-                                $query->setParameter('linkWebsiteHosts', $val);
-                                break;
-                            case 'linkRelativeReferences':
-                                $c = \count($val);
-                                if ($c < 1) break;
-
-                                $q11Func($q11, $query);
-
-                                foreach ($val as $k => $v) {
-                                    switch ($v) {
-                                        case null:
-                                            $val[$k] = '';
-                                            break;
-                                        case '':
-                                            $val[$k] = null;
-                                            break;
-                                    }
-                                }
-
-                                if ($c == 1) {
-                                    $query->andWhere('cd2l.relativeReference = :linkRelativeReference');
-                                    $query->setParameter('linkRelativeReference', $val[0]);
-                                    break;
-                                }
-                                $query->andWhere('cd2l.relativeReference IN (:linkRelativeReferences)');
-                                $query->setParameter('linkRelativeReferences', $val);
-                                break;
-                            case 'linkHREFs':
-                                $c = \count($val);
-                                if ($c < 1) break;
-
-                                $q11Func($q11, $query);
-                                $q111Func($q111, $query);
-
-                                $qExOr = $query->expr()->orX();
-                                foreach ($val as $k => $v) {
-                                    $href = new Href($v);
-
-                                    $qExOr->add('cd2lw.host = :linkHREFA' . $k . ' AND ' . 'cd2l.relativeReference = :linkHREFB' . $k);
-                                    $query->setParameter('linkHREFA' . $k, $href->getHost());
-                                    $query->setParameter('linkHREFB' . $k, $href->getRelativeReference() ?? '');
-                                }
-                                $query->andWhere($qExOr);
-                                break;
-                        }
+                    if ($c == 1) {
+                        $query->andWhere('cp2l.relativeReference = :providerLinkRelativeReference');
+                        $query->setParameter('providerLinkRelativeReference', $val[0]);
+                        break;
                     }
+                    $query->andWhere('cp2l.relativeReference IN (:providerLinkRelativeReferences)');
+                    $query->setParameter('providerLinkRelativeReferences', $val);
+                    break;
+                case 'providerLinkHREFs':
+                    $c = \count($val);
+                    if ($c < 1) break;
+
+                    $q1Func($q1, $query);
+                    $q11Func($q11, $query);
+                    $q111Func($q111, $query);
+
+                    $qExOr = $query->expr()->orX();
+                    foreach ($val as $k => $v) {
+                        $href = new Href($v);
+
+                        $qExOr->add('cp2lw.host = :providerLinkHREFA' . $k . ' AND ' . 'cp2l.relativeReference = :providerLinkHREFB' . $k);
+                        $query->setParameter('providerLinkHREFA' . $k, $href->getHost());
+                        $query->setParameter('providerLinkHREFB' . $k, $href->getRelativeReference() ?? '');
+                    }
+                    $query->andWhere($qExOr);
+                    break;
+                case 'providerLanguageLangs':
+                    $c = \count($val);
+                    if ($c < 1) break;
+
+                    $q1Func($q1, $query);
+                    $q12Func($q12, $query);
+
+                    if ($c == 1) {
+                        $query->andWhere('cp2la.lang = :providerLanguageLang');
+                        $query->setParameter('providerLanguageLang', $val[0]);
+                        break;
+                    }
+                    $query->andWhere('cp2la.lang IN (:providerLanguageLangs)');
+                    $query->setParameter('providerLanguageLangs', $val);
                     break;
             }
         }

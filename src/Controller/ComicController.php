@@ -70,8 +70,8 @@ class ComicController extends AbstractController
     public function fragmentList(
         int $limit,
         int $page,
-        array $orderBy = null,
-        string $type = null
+        array | null $orderBy = null,
+        string | null $type = null
     ): Response {
         $result = $this->comicRepository->findByCustom(
             [],
@@ -94,7 +94,7 @@ class ComicController extends AbstractController
     #[HttpKernel\Cache(public: true, maxage: 900, mustRevalidate: true)]
     public function fragmentWidget(
         int $limit,
-        array $orderBy = null
+        array | null $orderBy = null
     ): Response {
         $result = $this->comicRepository->findByCustom(
             [],
